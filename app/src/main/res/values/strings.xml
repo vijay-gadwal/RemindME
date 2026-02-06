@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RemindME</string>
+    <string name="app_author">Vijay Gadwal</string>
+    <string name="app_version">1.0.0</string>
+    <string name="widget_description">Quick view of your active tasks with voice and text capture</string>
+</resources>

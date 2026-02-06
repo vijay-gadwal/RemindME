@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Notebook body (rounded rectangle) -->
+    <path
+        android:pathData="M26,22 L82,22 C84.2,22 86,23.8 86,26 L86,82 C86,84.2 84.2,86 82,86 L26,86 C23.8,86 22,84.2 22,82 L22,26 C22,23.8 23.8,22 26,22 Z"
+        android:fillColor="#E87D1E"
+        android:fillAlpha="0.25" />
+
+    <!-- Spiral binding holes (left side) -->
+    <path
+        android:pathData="M24,32 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#CCCCCC" />
+    <path
+        android:pathData="M24,42 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#CCCCCC" />
+    <path
+        android:pathData="M24,52 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#CCCCCC" />
+    <path
+        android:pathData="M24,62 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#CCCCCC" />
+    <path
+        android:pathData="M24,72 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#CCCCCC" />
+
+    <!-- Colored tabs (right side) -->
+    <path
+        android:pathData="M84,30 L90,30 C91.1,30 92,30.9 92,32 L92,38 C92,39.1 91.1,40 90,40 L84,40 Z"
+        android:fillColor="#4FC3F7" />
+    <path
+        android:pathData="M84,43 L90,43 C91.1,43 92,43.9 92,45 L92,51 C92,52.1 91.1,53 90,53 L84,53 Z"
+        android:fillColor="#66BB6A" />
+    <path
+        android:pathData="M84,56 L90,56 C91.1,56 92,56.9 92,58 L92,64 C92,65.1 91.1,66 90,66 L84,66 Z"
+        android:fillColor="#EF5350" />
+    <path
+        android:pathData="M84,69 L90,69 C91.1,69 92,69.9 92,71 L92,77 C92,78.1 91.1,79 90,79 L84,79 Z"
+        android:fillColor="#FFA726" />
+
+    <!-- Alarm clock body (white filled circle) -->
+    <path
+        android:pathData="M54,54 m-18,0 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Left alarm bell -->
+    <path
+        android:pathData="M38.5,37 L33,31.5 C31.8,30.3 31.8,28.3 33,27.1 C34.2,25.9 36.2,25.9 37.4,27.1 L42.9,32.6"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Right alarm bell -->
+    <path
+        android:pathData="M69.5,37 L75,31.5 C76.2,30.3 76.2,28.3 75,27.1 C73.8,25.9 71.8,25.9 70.6,27.1 L65.1,32.6"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Hour hand (pointing to ~10 o'clock) -->
+    <path
+        android:pathData="M54,54 L46,45"
+        android:strokeColor="#F48C2C"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Minute hand (pointing to ~12 o'clock) -->
+    <path
+        android:pathData="M54,54 L54,40"
+        android:strokeColor="#F48C2C"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Center dot -->
+    <path
+        android:pathData="M54,54 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#F48C2C" />
+
+    <!-- Left foot -->
+    <path
+        android:pathData="M39,71 L35,76"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Right foot -->
+    <path
+        android:pathData="M69,71 L73,76"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Top knob -->
+    <path
+        android:pathData="M52,35 L56,35 L56,32 C56,31 55.1,30 54,30 C52.9,30 52,31 52,32 Z"
+        android:fillColor="#FFFFFF" />
+
+</vector>
