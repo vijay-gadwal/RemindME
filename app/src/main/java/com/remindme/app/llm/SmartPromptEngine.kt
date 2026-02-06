@@ -146,28 +146,76 @@ Keep it encouraging and specific to their goal."""
         userInput: String,
         activeTasks: List<Task>,
         activeGoals: List<Goal>,
-        currentLocation: String? = null
+        currentLocation: String? = null,
+        recentHistory: List<Pair<String, Boolean>> = emptyList() // (message, isFromUser)
     ): String {
+        val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
         val taskContext = if (activeTasks.isNotEmpty()) {
-            "Active tasks: ${activeTasks.take(5).joinToString("; ") { it.description }}"
-        } else "No active tasks"
+            val taskLines = activeTasks.take(10).joinToString("\n") { task ->
+                val priority = "[${task.priority.name}]"
+                val loc = task.locationName?.let { " @ $it" } ?: ""
+                val due = task.dueDate?.let { " due ${dateFormat.format(Date(it))}" } ?: ""
+                val cat = task.category?.let { " ($it)" } ?: ""
+                "- $priority ${task.description}$cat$loc$due"
+            }
+            "Active tasks (${activeTasks.size} total):\n$taskLines"
+        } else "No active tasks."
 
         val goalContext = if (activeGoals.isNotEmpty()) {
-            "Active goals: ${activeGoals.take(3).joinToString("; ") { "${it.title} (${it.progress.toInt()}%)" }}"
-        } else "No active goals"
+            val goalLines = activeGoals.take(5).joinToString("\n") { goal ->
+                val streak = if (goal.currentStreak > 0) " streak:${goal.currentStreak}d" else ""
+                "- ${goal.title} [${goal.category.name}] ${goal.progress.toInt()}%$streak ${goal.status.name}"
+            }
+            "Active goals (${activeGoals.size} total):\n$goalLines"
+        } else "No active goals."
 
-        val locationContext = currentLocation?.let { "User location: $it" } ?: ""
+        val locationContext = currentLocation?.let { "User is currently in: $it" } ?: ""
+        val timeContext = "Current time: ${SimpleDateFormat("h:mm a, EEEE MMM d", Locale.getDefault()).format(Date())}"
+
+        val historyContext = if (recentHistory.isNotEmpty()) {
+            val historyLines = recentHistory.joinToString("\n") { (msg, isUser) ->
+                val role = if (isUser) "User" else "Assistant"
+                "$role: ${msg.take(200)}"
+            }
+            "Recent conversation:\n$historyLines"
+        } else ""
 
         return """$SYSTEM_CONTEXT
 
-Context:
+User's current context:
+$timeContext
+$locationContext
 $taskContext
 $goalContext
-$locationContext
+$historyContext
 
 User says: "$userInput"
 
-Respond helpfully based on the user's context. If they mention something related to their tasks or goals, reference them specifically. Be conversational and concise."""
+Respond helpfully. Reference specific tasks or goals when relevant. If the user asks a general question, answer it using their task/goal context. Consider the recent conversation for continuity. Be conversational and concise (2-4 sentences)."""
+    }
+
+    fun buildActionEnhancementPrompt(
+        userInput: String,
+        actionResult: String,
+        activeTasks: List<Task>,
+        activeGoals: List<Goal>
+    ): String {
+        val taskSummary = if (activeTasks.isNotEmpty()) {
+            "Other active tasks: ${activeTasks.take(5).joinToString(", ") { it.description }}"
+        } else ""
+
+        val goalSummary = if (activeGoals.isNotEmpty()) {
+            "Active goals: ${activeGoals.take(3).joinToString(", ") { it.title }}"
+        } else ""
+
+        return """$SYSTEM_CONTEXT
+
+The user said: "$userInput"
+I performed this action: $actionResult
+$taskSummary
+$goalSummary
+
+Add ONE brief helpful tip or observation (1 sentence max) related to this action. For example, relate it to their other tasks/goals, suggest a follow-up, or note timing. Be specific, not generic. If there's nothing useful to add, respond with just "ok"."""
     }
 
     fun buildDailyMotivationPrompt(
@@ -185,6 +233,14 @@ Generate a brief morning motivation message for a user with:
 ${topGoal?.let { "- Top goal: ${it.title} at ${it.progress.toInt()}%" } ?: ""}
 
 Keep it to 1-2 sentences. Be specific and encouraging, not generic."""
+    }
+
+    fun buildChatResponsePrompt(
+        userInput: String,
+        activeTasks: List<Task>,
+        activeGoals: List<Goal>
+    ): String {
+        return buildContextualResponsePrompt(userInput, activeTasks, activeGoals)
     }
 
     fun parseIntentResponse(response: String): ParsedIntent {

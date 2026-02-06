@@ -8,9 +8,6 @@ import com.remindme.app.engine.ContextMatcher
 import com.remindme.app.engine.UserIntent
 import com.remindme.app.location.LocationManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 data class IntelligentResponse(
@@ -40,31 +37,31 @@ enum class ActionType {
 
 class ConversationIntelligence(private val context: Context) {
 
-    private val modelManager = GemmaModelManager(context)
+    private val modelManager = GemmaModelManager.getInstance(context)
     private val database = AppDatabase.getDatabase(context)
     private val locationManager = LocationManager(context)
 
-    private val _isLlmAvailable = MutableStateFlow(false)
-    val isLlmAvailable: StateFlow<Boolean> = _isLlmAvailable.asStateFlow()
+    val isLlmAvailable: Boolean
+        get() = modelManager.isModelDownloaded()
 
-    init {
-        _isLlmAvailable.value = modelManager.isModelDownloaded()
-    }
+    val isLlmLoaded: Boolean
+        get() = modelManager.isLoaded.value
 
     val modelInfo get() = modelManager.modelInfo
 
     suspend fun processWithIntelligence(
         userInput: String,
         activeTasks: List<Task>,
-        activeGoals: List<Goal>
+        activeGoals: List<Goal>,
+        recentHistory: List<Pair<String, Boolean>> = emptyList()
     ): IntelligentResponse = withContext(Dispatchers.IO) {
         // First: fast local intent detection (always available)
         val localIntent = ContextMatcher.detectIntent(userInput)
 
         // If LLM is available, try enhanced processing
-        if (_isLlmAvailable.value) {
+        if (isLlmAvailable) {
             try {
-                val llmResponse = processWithLlm(userInput, localIntent, activeTasks, activeGoals)
+                val llmResponse = processWithLlm(userInput, localIntent, activeTasks, activeGoals, recentHistory)
                 if (llmResponse != null) return@withContext llmResponse
             } catch (_: Exception) {
                 // Fall back to local processing
@@ -79,7 +76,8 @@ class ConversationIntelligence(private val context: Context) {
         userInput: String,
         localIntent: UserIntent,
         activeTasks: List<Task>,
-        activeGoals: List<Goal>
+        activeGoals: List<Goal>,
+        recentHistory: List<Pair<String, Boolean>>
     ): IntelligentResponse? {
         // Use LLM for contextual response when local intent is ambiguous
         val currentLocation = locationManager.currentLocation.value?.city
@@ -88,7 +86,8 @@ class ConversationIntelligence(private val context: Context) {
             userInput = userInput,
             activeTasks = activeTasks,
             activeGoals = activeGoals,
-            currentLocation = currentLocation
+            currentLocation = currentLocation,
+            recentHistory = recentHistory
         )
 
         val llmText = modelManager.generateResponse(prompt) ?: return null
@@ -173,7 +172,7 @@ class ConversationIntelligence(private val context: Context) {
     }
 
     suspend fun generateTaskSummary(): String? {
-        if (!_isLlmAvailable.value) return null
+        if (!isLlmAvailable) return null
         val tasks = database.taskDao().getActiveTasksSync()
         if (tasks.isEmpty()) return null
 
@@ -182,7 +181,7 @@ class ConversationIntelligence(private val context: Context) {
     }
 
     suspend fun generateGoalProgress(goalId: Long): String? {
-        if (!_isLlmAvailable.value) return null
+        if (!isLlmAvailable) return null
         val goal = database.goalDao().getGoalById(goalId) ?: return null
         val milestones = database.milestoneDao().getMilestonesForGoalSync(goalId)
 
@@ -191,7 +190,7 @@ class ConversationIntelligence(private val context: Context) {
     }
 
     suspend fun suggestGoalMilestones(goalId: Long): List<String> {
-        if (!_isLlmAvailable.value) return emptyList()
+        if (!isLlmAvailable) return emptyList()
         val goal = database.goalDao().getGoalById(goalId) ?: return emptyList()
 
         val prompt = SmartPromptEngine.buildGoalSubTaskPrompt(goal)
@@ -210,7 +209,7 @@ class ConversationIntelligence(private val context: Context) {
     }
 
     suspend fun suggestSmartSnooze(taskId: Long): String? {
-        if (!_isLlmAvailable.value) return null
+        if (!isLlmAvailable) return null
         val task = database.taskDao().getTaskById(taskId) ?: return null
 
         val prompt = SmartPromptEngine.buildSmartSnoozePrompt(task, System.currentTimeMillis())
@@ -218,7 +217,7 @@ class ConversationIntelligence(private val context: Context) {
     }
 
     suspend fun generateReflectionPrompt(goalId: Long): String? {
-        if (!_isLlmAvailable.value) return null
+        if (!isLlmAvailable) return null
         val goal = database.goalDao().getGoalById(goalId) ?: return null
 
         val daysSinceStart = (System.currentTimeMillis() - goal.createdAt) / (24 * 60 * 60 * 1000)
@@ -227,7 +226,7 @@ class ConversationIntelligence(private val context: Context) {
     }
 
     suspend fun generateDailyMotivation(): String? {
-        if (!_isLlmAvailable.value) return null
+        if (!isLlmAvailable) return null
 
         val tasks = database.taskDao().getActiveTasksSync()
         val goals = database.goalDao().getActiveGoalsSync()

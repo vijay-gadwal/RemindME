@@ -102,7 +102,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val taskMatches = ContextMatcher.matchTasksToContext(input, activeTasks, taskTags)
             val goalMatches = ContextMatcher.matchGoalsToContext(input, activeGoals)
 
-            // Process based on intent
+            // Process based on intent — LOCAL FIRST, LLM only for complex/ambiguous
             var response: String
             val relatedTaskIds = mutableListOf<Long>()
             val relatedGoalIds = mutableListOf<Long>()
@@ -121,7 +121,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             priority = parsed.priority
                         )
                     )
-                    // Add auto-detected tags
                     for ((tagName, tagType) in parsed.tags) {
                         taskRepository.addTagToTask(taskId, tagName, tagType)
                     }
@@ -170,7 +169,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 UserIntent.GOING_SOMEWHERE -> {
-                    // Also check keyword-based matches
                     val parsed = AutoTagger.parseInput(input)
                     val keywordTasks = if (parsed.locationName != null) {
                         taskRepository.findMatchingTasks(
@@ -190,7 +188,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 UserIntent.STATUS_UPDATE -> {
-                    // Save as a note on matching tasks, or create new task
                     if (taskMatches.isNotEmpty()) {
                         val task = taskMatches.first().task
                         val updatedNotes = buildString {
@@ -202,7 +199,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         response = "📝 Noted! Added this update to \"${task.description}\".\n" +
                                 "I'll include this in the summary when relevant."
                     } else {
-                        // Create a new task as an informational note
                         val parsed = AutoTagger.parseInput(input)
                         val taskId = taskRepository.insertTask(
                             Task(
@@ -248,59 +244,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     val allActiveTasks = taskRepository.getActiveTasksSync()
                     val allActiveGoals = goalRepository.getActiveGoalsSync()
 
-                    // Try LLM-powered summary first
+                    // Build local summary first (always available)
+                    val localSummary = buildLocalSummary(allActiveTasks, allActiveGoals)
+
+                    // Try LLM for an enhanced AI summary to append
                     val llmSummary = try {
                         conversationIntelligence.generateTaskSummary()
                     } catch (_: Exception) { null }
 
-                    response = if (llmSummary != null) {
-                        "📊 **AI Summary**\n\n$llmSummary"
+                    response = if (llmSummary != null && llmSummary.isNotBlank()) {
+                        "$localSummary\n\n💡 **AI Insight**\n$llmSummary"
                     } else {
-                        buildString {
-                            append("📊 Your RemindME Summary\n\n")
-                            if (allActiveTasks.isNotEmpty()) {
-                                append("📋 ${allActiveTasks.size} pending task(s):\n")
-                                allActiveTasks.take(10).forEachIndexed { i, task ->
-                                    val icon = when (task.priority) {
-                                        Priority.URGENT -> "🔴"
-                                        Priority.HIGH -> "🟠"
-                                        Priority.MEDIUM -> "🟡"
-                                        Priority.LOW -> "⚪"
-                                    }
-                                    append("$icon ${i + 1}. ${task.description}\n")
-                                }
-                                if (allActiveTasks.size > 10) {
-                                    append("...and ${allActiveTasks.size - 10} more\n")
-                                }
-                            } else {
-                                append("📋 No pending tasks!\n")
-                            }
-                            append("\n")
-                            if (allActiveGoals.isNotEmpty()) {
-                                append("🎯 ${allActiveGoals.size} active goal(s):\n")
-                                allActiveGoals.forEachIndexed { i, goal ->
-                                    val statusIcon = when (goal.status) {
-                                        GoalStatus.IN_PROGRESS -> "🟢"
-                                        GoalStatus.NOT_STARTED -> "⬜"
-                                        GoalStatus.ON_HOLD -> "⏸️"
-                                        else -> "✅"
-                                    }
-                                    append("$statusIcon ${i + 1}. ${goal.title} - ${goal.progress.toInt()}%")
-                                    if (goal.currentStreak > 0) append(" 🔥${goal.currentStreak}")
-                                    append("\n")
-                                }
-                            } else {
-                                append("🎯 No active goals.\n")
-                            }
-                        }
+                        localSummary
                     }
                 }
 
                 else -> {
-                    // Try to determine if it's more like a task or just conversation
+                    // Local-first: try to extract a task or match context
                     val parsed = AutoTagger.parseInput(input)
                     if (parsed.tags.isNotEmpty() || parsed.locationName != null || parsed.dueDate != null) {
-                        // Looks like a task - add it
+                        // Looks like a task — add it locally
                         val taskId = taskRepository.insertTask(
                             Task(
                                 description = parsed.description,
@@ -322,19 +285,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         response += "I'll remind you when the time is right!"
                     } else if (taskMatches.isNotEmpty() || goalMatches.isNotEmpty()) {
+                        // Matched existing tasks/goals — show context
                         response = ContextMatcher.generateResponse(input, UserIntent.GET_SUMMARY, taskMatches, goalMatches)
                     } else {
-                        // Try LLM for conversational response
+                        // Nothing matched locally — NOW use LLM for complex/ambiguous input
                         val llmResponse = try {
-                            conversationIntelligence.processWithIntelligence(input, activeTasks, activeGoals)
+                            if (conversationIntelligence.isLlmAvailable) {
+                                // Pass recent conversation history for context
+                                val history = _messages.value
+                                    .sortedByDescending { it.timestamp }
+                                    .take(10)
+                                    .reversed()
+                                    .map { it.text to it.isFromUser }
+                                val result = conversationIntelligence.processWithIntelligence(input, activeTasks, activeGoals, history)
+                                if (result.usedLlm && result.text.isNotBlank()) result.text else null
+                            } else null
                         } catch (_: Exception) { null }
 
-                        response = if (llmResponse != null && llmResponse.usedLlm && llmResponse.text.isNotBlank()) {
-                            llmResponse.text
-                        } else {
-                            "Got it! I've noted that. You can ask me for a summary anytime, " +
-                                    "or tell me about tasks you need reminders for."
-                        }
+                        response = llmResponse
+                            ?: ("Got it! I've noted that. You can ask me for a summary anytime, " +
+                                    "or tell me about tasks you need reminders for.")
                     }
                 }
             }
@@ -348,6 +318,46 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             _lastResponse.value = response
             _isProcessing.value = false
+        }
+    }
+
+    private fun buildLocalSummary(activeTasks: List<Task>, activeGoals: List<Goal>): String {
+        return buildString {
+            append("📊 Your RemindME Summary\n\n")
+            if (activeTasks.isNotEmpty()) {
+                append("📋 ${activeTasks.size} pending task(s):\n")
+                activeTasks.take(10).forEachIndexed { i, task ->
+                    val icon = when (task.priority) {
+                        Priority.URGENT -> "🔴"
+                        Priority.HIGH -> "🟠"
+                        Priority.MEDIUM -> "🟡"
+                        Priority.LOW -> "⚪"
+                    }
+                    append("$icon ${i + 1}. ${task.description}\n")
+                }
+                if (activeTasks.size > 10) {
+                    append("...and ${activeTasks.size - 10} more\n")
+                }
+            } else {
+                append("📋 No pending tasks!\n")
+            }
+            append("\n")
+            if (activeGoals.isNotEmpty()) {
+                append("🎯 ${activeGoals.size} active goal(s):\n")
+                activeGoals.forEachIndexed { i, goal ->
+                    val statusIcon = when (goal.status) {
+                        GoalStatus.IN_PROGRESS -> "🟢"
+                        GoalStatus.NOT_STARTED -> "⬜"
+                        GoalStatus.ON_HOLD -> "⏸️"
+                        else -> "✅"
+                    }
+                    append("$statusIcon ${i + 1}. ${goal.title} - ${goal.progress.toInt()}%")
+                    if (goal.currentStreak > 0) append(" 🔥${goal.currentStreak}")
+                    append("\n")
+                }
+            } else {
+                append("🎯 No active goals.\n")
+            }
         }
     }
 

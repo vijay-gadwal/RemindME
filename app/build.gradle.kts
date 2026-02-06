@@ -107,8 +107,8 @@ dependencies {
     // OkHttp for API calls (OSM Overpass, OSRM)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // MediaPipe LLM Inference for Gemma 2B on-device
-    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+    // MediaPipe LLM Inference for on-device Gemma models
+    implementation("com.google.mediapipe:tasks-genai:0.10.22")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
